@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-accent: var(--accent-primary);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-border: var(--border);
+  
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+:root {
+  --background: #050505;
+  --foreground: #ffffff;
+  --accent-primary: #E8002D; /* Defaults to Ferrari Red, overwritten by JS */
+  --card: rgba(25, 25, 25, 0.4);
+  --card-foreground: #ffffff;
+  --border: rgba(255, 255, 255, 0.08);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+  /* Dynamic ambient glow matching the user's favorite team */
+  background-image: radial-gradient(circle at top right, color-mix(in srgb, var(--accent-primary) 15%, transparent), transparent 60%),
+                    radial-gradient(circle at bottom left, rgba(255, 255, 255, 0.03), transparent 50%);
+  background-attachment: fixed;
+}
+
+@layer utilities {
+  .glass-panel {
+    @apply bg-card backdrop-blur-xl border border-border shadow-2xl;
+  }
+}
