@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     }
 
     const seasonYear = 2026; // Hardcoded tracking for 2026 season
-    const syncResults: any = { racesSynced: 0, driversSynced: 0, constructorsSynced: 0 };
+    const syncResults: any = { racesSynced: 0, driversSynced: 0, constructorsSynced: 0, weatherSynced: 0, raceControlSynced: 0, sessionResultsSynced: 0 };
 
     // --- 1. Fetch Racing Sessions ---
     // Taking the master race sessions only
@@ -95,6 +95,72 @@ export async function GET(request: Request) {
            await supabase.from('constructor_standings').delete().eq('season', seasonYear);
            const { data: csData, error: csError } = await supabase.from('constructor_standings').insert(teamStandings).select();
            if (!csError) syncResults.constructorsSynced = csData?.length || teamStandings.length;
+        }
+
+        // --- 4. Fetch Weather Events ---
+        const weatherRes = await fetch(`https://api.openf1.org/v1/weather?session_key=${sessionKey}`);
+        if (weatherRes.ok) {
+           const weatherEvents = await weatherRes.json();
+           const weatherData = weatherEvents.map((w: any) => ({
+             session_key: sessionKey,
+             meeting_key: latestSession.meeting_key,
+             recorded_at: w.date,
+             air_temperature: w.air_temperature,
+             track_temperature: w.track_temperature,
+             humidity: w.humidity,
+             rainfall: w.rainfall,
+             wind_speed: w.wind_speed,
+             wind_direction: w.wind_direction
+           }));
+           
+           if (weatherData.length > 0) {
+              const { data: wData, error: wError } = await supabase.from('weather_events').upsert(weatherData, { onConflict: 'session_key, recorded_at' }).select();
+              if (!wError) syncResults.weatherSynced = wData?.length || weatherData.length;
+           }
+        }
+
+        // --- 5. Fetch Race Control Messages ---
+        const controlRes = await fetch(`https://api.openf1.org/v1/race_control?session_key=${sessionKey}`);
+        if (controlRes.ok) {
+           const controlEvents = await controlRes.json();
+           const controlData = controlEvents.map((c: any) => ({
+             session_key: sessionKey,
+             meeting_key: latestSession.meeting_key,
+             timestamp: c.date,
+             category: c.category,
+             message: c.message,
+             flag: c.flag,
+             driver_number: c.driver_number,
+             scope: c.scope,
+             sector: c.sector
+           }));
+           
+           if (controlData.length > 0) {
+              const { data: cData, error: cError } = await supabase.from('race_control').upsert(controlData, { onConflict: 'session_key, timestamp, message' }).select();
+              if (!cError) syncResults.raceControlSynced = cData?.length || controlData.length;
+           }
+        }
+
+        // --- 6. Fetch Session Results ---
+        const resultsRes = await fetch(`https://api.openf1.org/v1/session_result?session_key=${sessionKey}`);
+        if (resultsRes.ok) {
+           const sessionResults = await resultsRes.json();
+           const resultsData = sessionResults.filter((r: any) => r.driver_number).map((r: any) => ({
+             session_key: sessionKey,
+             meeting_key: latestSession.meeting_key,
+             driver_number: r.driver_number,
+             position: r.position,
+             grid_position: r.starting_grid_position,
+             status: r.status,
+             points: r.points,
+             time_penalty: r.time_penalty,
+             fastest_lap: r.fastest_lap || false
+           }));
+
+           if (resultsData.length > 0) {
+              const { data: rData, error: rError } = await supabase.from('session_results').upsert(resultsData, { onConflict: 'session_key, driver_number' }).select();
+              if (!rError) syncResults.sessionResultsSynced = rData?.length || resultsData.length;
+           }
         }
       }
     }

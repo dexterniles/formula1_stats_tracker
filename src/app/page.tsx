@@ -18,6 +18,21 @@ export default async function DashboardPage() {
     .select('*, constructors(name, color_hex)')
     .order('position', { ascending: true });
 
+  // Fetch the latest Weather telemetry for the track
+  const { data: weatherData } = await supabase
+    .from('weather_events')
+    .select('*')
+    .order('recorded_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  // Fetch recent Race Control messages (latest 20)
+  const { data: raceControlData } = await supabase
+    .from('race_control')
+    .select('*')
+    .order('timestamp', { ascending: false })
+    .limit(20);
+
   const nextRace = nextRaces?.[0] || null;
 
   return (
@@ -30,6 +45,8 @@ export default async function DashboardPage() {
       <DashboardClient 
         nextRace={nextRace} 
         standings={constructorStandings || []} 
+        weatherEvent={weatherData || null}
+        recentControls={raceControlData || []}
       />
     </div>
   );
